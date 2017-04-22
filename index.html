@@ -1,0 +1,182 @@
+<html lang="en">
+    <head>
+        <title>particles</title>
+        <meta charset="utf-8">
+
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1, maximum-scale=1">
+        <style>
+            body {
+                background-color: #000000;
+                margin: 0px;
+                overflow: hidden;
+            }
+        </style>
+        <body>
+            <script src="js/three.min.js"></script>
+            <script src="js/renderers/Projector.js"></script>
+            <script src="js/renderers/CanvasRenderer.js"></script>
+            <script>
+                var container;
+                var camera, scene, renderer, particle, center;
+                var canvasSource, video, contextSource, contextBlended, lastImageData;
+                var mouseX = 0, mouseY = 0;
+                var hasCamera = false;
+
+                var windowHalfX = window.innerWidth / 2;
+                var windowHalfY = window.innerHeight / 2;
+
+                init();
+                animate();
+
+                function init() {
+                    container = document.createElement('div');
+                    document.body.appendChild(container);
+
+                    canvasSource = document.createElement('canvas');
+                    canvasBlended = document.createElement('canvas');
+                    //document.body.appendChild(canvasBlended);
+                    //document.body.appendChild(canvasSource);
+                    canvasSource.width = canvasBlended.width = 500;
+                    canvasSource.height = canvasBlended.height = 375;
+
+                    center = {x: window.innerWidth / 2, y: window.innerHeight / 2};
+                    
+                    contextBlended = canvasBlended.getContext('2d');
+                    contextSource = canvasSource.getContext('2d');
+
+                    video = document.createElement('video');
+                    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+                    if (navigator.getUserMedia) {
+                        navigator.getUserMedia({video: true}, function(stream) {
+                                video.src = window.URL.createObjectURL(stream);
+                                hasCamera = true;
+                            }, function(err) {
+                            console.log(err);
+                            });
+                    }
+
+                    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
+                    camera.position.z = 1000;
+
+                    scene = new THREE.Scene();
+
+                    var material = new THREE.SpriteMaterial();
+
+                    for (var i = 0; i < 50; i++) {
+                        for (var j = 0; j < 50; j++) {
+                            particle = new THREE.Sprite(material);
+                            particle.scale.y = 20;
+                            particle.position.x = i * 100 - 50 * 100 / 2;
+                            particle.position.z = j * 100 - 50 * 100 / 2;
+                            scene.add(particle);
+                        }
+                    }
+
+                    renderer = new THREE.CanvasRenderer();
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    container.appendChild(renderer.domElement);
+
+                    document.addEventListener('mousemove', onDocumentMouseMove, false );
+                    document.addEventListener('DOMContentLoaded', onDomContentLoaded, false);
+                    window.addEventListener('resize', onWindowResize, false);
+
+                }
+
+                function onDomContentLoaded() {
+                    v = document.getElementById('cam');
+                }
+
+                function onWindowResize() {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }
+                function onDocumentMouseMove(event) {
+                    mouseX = event.clientX - window.innerWidth / 2;
+                    mouseY = event.clientY - window.innerHeight / 2;
+                }
+
+                function fastAbs(value) {
+                    // equivalent to Math.abs();
+                    return (value ^ (value >> 31)) - (value >> 31);
+                }
+
+                function threshold(value) {
+                    return (value > 0x15) ? 0xFF : 0;
+                }
+
+                function differenceAccuracy(target, data1, data2) {
+                    if (data1.length != data2.length) return null;
+                    var i = 0;
+                    var center = {x: 0, y: 0};
+                    var width = canvasSource.width;
+                    var x = 0;
+                    var y = 0;
+                    var total = 0;
+                    while (i < (data1.length * 0.25)) {
+                        if (x >= width) {
+                            y++;
+                            x = 0;
+                        }
+                        var average1 = (data1[4*i] + data1[4*i+1] + data1[4*i+2]) / 3;
+                        var average2 = (data2[4*i] + data2[4*i+1] + data2[4*i+2]) / 3;
+                        var diff = threshold(fastAbs(average1 - average2));
+                        if (diff > 0) {
+                            center.x += x;
+                            center.y += y;
+                            total++;
+                        }
+                        target[4*i] = diff;
+                        target[4*i+1] = diff;
+                        target[4*i+2] = diff;
+                        target[4*i+3] = 0xFF;
+                        ++i;
+                        x++;
+                    }
+                    if (total > 0) {
+                        center.x = center.x / total;
+                        center.y = center.y / total;
+                    }
+                    return center;
+                }
+
+                function blend() {
+                    var width = canvasSource.width;
+                    var height = canvasSource.height;
+                    var sourceData = contextSource.getImageData(0, 0, width, height);
+                    if (!lastImageData) {
+                        lastImageData = contextSource.getImageData(0, 0, width, height);
+                    }
+                    var blendedData = contextSource.createImageData(width, height);
+                    var newCenter = differenceAccuracy(blendedData.data, sourceData.data, lastImageData.data);
+                    if (newCenter.x > 0 || newCenter.y > 0) {
+                        center = newCenter;
+                        console.log(center);
+                    }
+                    contextBlended.putImageData(blendedData, 0, 0);
+                    lastImageData = sourceData;
+                }
+
+                function animate() {
+                    requestAnimationFrame(animate);
+
+                    if (hasCamera) {
+                        contextSource.drawImage(video, 0, 0, canvasSource.width, canvasSource.height);
+                        blend();
+                    }
+                    
+                    newX = center.x * window.innerWidth / canvasSource.width - window.innerWidth / 2;
+                    newY = center.y * window.innerHeight / canvasSource.height - window.innerHeight / 2;
+
+                    camera.position.x += (newX - camera.position.x) *.05;
+                    camera.position.y += (newY - camera.position.y) * 0.05;
+                    camera.lookAt( scene.position );
+
+                    renderer.render(scene, camera);
+                }
+            </script>
+        </body>
+    </head>
+</html>
