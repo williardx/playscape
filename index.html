@@ -176,7 +176,7 @@
         }
         function animate() {
             requestAnimationFrame( animate );
-            controls.update();
+            // controls.update();
             var delta = clock.getDelta() * spawnerOptions.timeScale;
             tick += delta;
             if ( tick < 0 ) tick = 0;
