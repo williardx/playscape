@@ -144,7 +144,7 @@
                 var average2 = (data2[4*i] + data2[4*i+1] + data2[4*i+2]) / 3;
                 var diff = threshold(fastAbs(average1 - average2));
                 if (diff > 0) {
-                    generateParticle(x, y, 5);
+                    generateParticle(x, y, 2);
                 }
                 target[4*i] = diff;
                 target[4*i+1] = diff;
@@ -169,8 +169,8 @@
         }
 
         function generateParticle(x, y, z) {
-            options.position.x = x - canvasSource.width / 2;
-            options.position.y = y - canvasSource.height / 2;
+            options.position.x = -(x - canvasSource.width / 2) * 1.5;
+            options.position.y = -(y - canvasSource.height / 2) * 1.3;
             options.position.z = z;
             particleSystem.spawnParticle( options );
         }
@@ -181,18 +181,8 @@
             tick += delta;
             if ( tick < 0 ) tick = 0;
             if ( delta > 0 ) {
-
                 contextSource.drawImage(video, 0, 0, canvasSource.width, canvasSource.height);
                 blend();
-                /*
-                options.position.x = Math.sin( tick * spawnerOptions.horizontalSpeed ) * 20;
-                options.position.y = Math.sin( tick * spawnerOptions.verticalSpeed ) * 10;
-                options.position.z = Math.sin( tick * spawnerOptions.horizontalSpeed + spawnerOptions.verticalSpeed ) * 5;
-                for ( var x = 0; x < spawnerOptions.spawnRate * delta; x++ ) {
-                    // Yep, that's really it.	Spawning particles is super cheap, and once you spawn them, the rest of
-                    // their lifecycle is handled entirely on the GPU, driven by a time uniform updated below
-                    particleSystem.spawnParticle( options );
-                }*/
             }
             particleSystem.update( tick );
             render();
