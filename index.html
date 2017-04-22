@@ -1,216 +1,206 @@
+<!DOCTYPE html>
 <html lang="en">
-    <head>
-        <title>particles</title>
-        <meta charset="utf-8">
+<head>
+    <title>Playscale</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+    body {
+        font-family: Monospace;
+        background-color: #f0f0f0;
+        margin: 0px;
+        overflow: hidden;
+    }
+    #info {
+        position: absolute;
+        top: 0px;
+        width: 100%;
+        padding: 5px;
+        font-family:Monospace;
+        font-size:13px;
+        text-align:center;
+        color: #ffffff;
+    }
+    a {
+        color: #ffffff;
+    }
+    </style>
+</head>
 
-        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1, maximum-scale=1">
-        <style>
-            body {
-                background-color: #000;
-                margin: 0px;
-                overflow: hidden;
+<body>
+
+    <div id="container"></div>
+    <script src="js/three.min.js"></script>
+    <script src="./js/TrackballControls.js"></script>
+    <script src="./js/GPUParticleSystem.js"></script>
+
+    <script>
+        var camera, tick = 0,
+            scene, renderer, clock = new THREE.Clock(),
+            controls, container, 
+            options, spawnerOptions, particleSystem;
+
+        var canvasSource, video, contextSource, contextBlended, lastImageData;
+        init();
+        animate();
+        function init() {
+            //
+            container = document.getElementById( 'container' );
+            initVideo();
+            camera = new THREE.PerspectiveCamera( 28, window.innerWidth / window.innerHeight, 1, 10000 );
+            camera.position.z = 500;
+            scene = new THREE.Scene();
+            // The GPU Particle system extends THREE.Object3D, and so you can use it
+            // as you would any other scene graph component.    Particle positions will be
+            // relative to the position of the particle system, but you will probably only need one
+            // system for your whole scene
+            particleSystem = new THREE.GPUParticleSystem( {
+                maxParticles: 250000
+            } );
+            scene.add( particleSystem );
+            // options passed during each spawned
+            options = {
+                position: new THREE.Vector3(),
+                positionRandomness: .3,
+                velocity: new THREE.Vector3(),
+                velocityRandomness: .5,
+                color: 0xaa88ff,
+                colorRandomness: .2,
+                turbulence: .5,
+                lifetime: 2,
+                size: 5,
+                sizeRandomness: 1
+            };
+            spawnerOptions = {
+                spawnRate: 15000,
+                horizontalSpeed: 1.5,
+                verticalSpeed: 1.33,
+                timeScale: 1
+            };
+            //
+            //
+            //
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            container.appendChild( renderer.domElement );
+            //
+            controls = new THREE.TrackballControls( camera, renderer.domElement );
+            controls.rotateSpeed = 5.0;
+            controls.zoomSpeed = 2.2;
+            controls.panSpeed = 1;
+            controls.dynamicDampingFactor = 0.3;
+            window.addEventListener( 'resize', onWindowResize, false );
+        }
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize( window.innerWidth, window.innerHeight );
+        }
+
+        function initVideo() {
+            canvasSource = document.createElement('canvas');
+            canvasBlended = document.createElement('canvas');
+            canvasSource.width = canvasBlended.width = 250;
+            canvasSource.height = canvasBlended.height = 182;
+
+            center = {x: window.innerWidth / 2, y: window.innerHeight / 2};
+
+            contextBlended = canvasBlended.getContext('2d');
+            contextSource = canvasSource.getContext('2d');
+
+            video = document.createElement('video');
+            navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+            if (navigator.getUserMedia) {
+                navigator.getUserMedia({video: true}, function(stream) {
+                    video.src = window.URL.createObjectURL(stream);
+                    hasCamera = true;
+                }, function(err) {
+                });
             }
-        </style>
-        <body>
-            <script src="js/three.min.js"></script>
-            <script src="js/GPUParticleSystem.js"></script>
-            <script src="js/TrackballControls.js"></script>
-            <script src="js/renderers/Projector.js"></script>
-            <script src="js/renderers/CanvasRenderer.js"></script>
-            <script>
-                var container;
-                var clock = new THREE.Clock();
-                var options = {
-                    position: new THREE.Vector3(),
-                    positionRandomness: 0.3,
-                    velocity: new THREE.Vector3(),
-                    velocityRandomness: 0.1,
-                    color: 0x77777,
-                    turbulence: 0.5,
-                    size: 10,
-                    sizeRandomness: 2,
-                    lifetime: 10
-                };
+        }
+        function fastAbs(value) {
+            // equivalent to Math.abs();
+            return (value ^ (value >> 31)) - (value >> 31);
+        }
 
-                var spawnerOption = {
-                    spawnRate: 1500,
-                    verticalSpeed: 1
-                };
-                var particleSystem;
-                var camera, scene, renderer, particle, center, tick, controls;
-                var canvasSource, video, contextSource, contextBlended, lastImageData;
-                var mouseX = 0, mouseY = 0;
-                var hasCamera = false;
+        function threshold(value) {
+            return (value > 0x15) ? 0xFF : 0;
+        }
 
-                var windowHalfX = window.innerWidth / 2;
-                var windowHalfY = window.innerHeight / 2;
-
-                init();
-                animate();
-
-                function init() {
-                    container = document.createElement('div');
-                    document.body.appendChild(container);
-
-                    canvasSource = document.createElement('canvas');
-                    canvasBlended = document.createElement('canvas');
-                   // document.body.appendChild(canvasBlended);
-                   // document.body.appendChild(canvasSource);
-                    canvasSource.width = canvasBlended.width = 250;
-                    canvasSource.height = canvasBlended.height = 182;
-
-                    center = {x: window.innerWidth / 2, y: window.innerHeight / 2};
-                    
-                    contextBlended = canvasBlended.getContext('2d');
-                    contextSource = canvasSource.getContext('2d');
-
-                    video = document.createElement('video');
-                    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
-                    if (navigator.getUserMedia) {
-                        navigator.getUserMedia({video: true}, function(stream) {
-                                video.src = window.URL.createObjectURL(stream);
-                                hasCamera = true;
-                            }, function(err) {
-                            });
-                    }
-
-                    camera = new THREE.PerspectiveCamera(28, window.innerWidth / window.innerHeight, 1, 10000);
-                    camera.position.z = 100;
-
-                    scene = new THREE.Scene();
-                    particleSystem = new THREE.GPUParticleSystem({
-                        maxParticles: 250000
-                    });
-                    scene.add(particleSystem);
-
-                    renderer = new THREE.WebGLRenderer();
-                    renderer.setPixelRatio(window.devicePixelRatio);
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                    container.appendChild(renderer.domElement);
-
-                    controls = new THREE.TrackballControls( camera, renderer.domElement );
-                    controls.rotateSpeed = 5.0;
-                    controls.zoomSpeed = 2.2;
-                    controls.panSpeed = 1;
-                    controls.dynamicDampingFactor = 0.3;
-
-                    document.addEventListener('mousemove', onDocumentMouseMove, false );
-                    document.addEventListener('DOMContentLoaded', onDomContentLoaded, false);
-                    window.addEventListener('resize', onWindowResize, false);
-
+        function differenceAccuracy(target, data1, data2) {
+            if (data1.length != data2.length) return null;
+            var i = 0;
+            var width = canvasSource.width;
+            var x = 0;
+            var y = 0;
+            var total = 0;
+            while (i < (data1.length * 0.25)) {
+                if (x >= width) {
+                    y++;
+                    x = 0;
                 }
-
-                function generateParticle(x, y, z) {
-                    options.position.x = x;
-                    options.position.y = y;
-                    options.position.z = z;
-                    particleSystem.spawnParticle(options);
+                var average1 = (data1[4*i] + data1[4*i+1] + data1[4*i+2]) / 3;
+                var average2 = (data2[4*i] + data2[4*i+1] + data2[4*i+2]) / 3;
+                var diff = threshold(fastAbs(average1 - average2));
+                if (diff > 0) {
+                    generateParticle(x, y, 5);
                 }
+                target[4*i] = diff;
+                target[4*i+1] = diff;
+                target[4*i+2] = diff;
+                target[4*i+3] = 0xFF;
+                ++i;
+                x++;
+            }
+        }
 
-                function onDomContentLoaded() {
-                    v = document.getElementById('cam');
-                }
+        function blend() {
+            var width = canvasSource.width;
+            var height = canvasSource.height;
+            var sourceData = contextSource.getImageData(0, 0, width, height);
+            if (!lastImageData) {
+                lastImageData = contextSource.getImageData(0, 0, width, height);
+            }
+            var blendedData = contextSource.createImageData(width, height);
+            differenceAccuracy(blendedData.data, sourceData.data, lastImageData.data);
+            contextBlended.putImageData(blendedData, 0, 0);
+            lastImageData = sourceData;
+        }
 
-                function onWindowResize() {
-                    camera.aspect = window.innerWidth / window.innerHeight;
-                    camera.updateProjectionMatrix();
+        function generateParticle(x, y, z) {
+            options.position.x = x - canvasSource.width / 2;
+            options.position.y = y - canvasSource.height / 2;
+            options.position.z = z;
+            particleSystem.spawnParticle( options );
+        }
+        function animate() {
+            requestAnimationFrame( animate );
+            controls.update();
+            var delta = clock.getDelta() * spawnerOptions.timeScale;
+            tick += delta;
+            if ( tick < 0 ) tick = 0;
+            if ( delta > 0 ) {
 
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                }
-                function onDocumentMouseMove(event) {
-                    mouseX = event.clientX - window.innerWidth / 2;
-                    mouseY = event.clientY - window.innerHeight / 2;
-                }
+                contextSource.drawImage(video, 0, 0, canvasSource.width, canvasSource.height);
+                blend();
+                /*
+                options.position.x = Math.sin( tick * spawnerOptions.horizontalSpeed ) * 20;
+                options.position.y = Math.sin( tick * spawnerOptions.verticalSpeed ) * 10;
+                options.position.z = Math.sin( tick * spawnerOptions.horizontalSpeed + spawnerOptions.verticalSpeed ) * 5;
+                for ( var x = 0; x < spawnerOptions.spawnRate * delta; x++ ) {
+                    // Yep, that's really it.	Spawning particles is super cheap, and once you spawn them, the rest of
+                    // their lifecycle is handled entirely on the GPU, driven by a time uniform updated below
+                    particleSystem.spawnParticle( options );
+                }*/
+            }
+            particleSystem.update( tick );
+            render();
+        }
+        function render() {
+            renderer.render( scene, camera );
+        }
+    </script>
+</body>
 
-                function fastAbs(value) {
-                    // equivalent to Math.abs();
-                    return (value ^ (value >> 31)) - (value >> 31);
-                }
-
-                function threshold(value) {
-                    return (value > 0x15) ? 0xFF : 0;
-                }
-
-                function translateX(x) {
-                    return x * window.innerWidth / canvasSource.width - window.innerWidth / 2;
-                }
-
-                function translateY(y) {
-                    return y * window.innerHeight / canvasSource.height - window.innerHeight / 2;
-                }
-
-                function differenceAccuracy(target, data1, data2) {
-                    if (data1.length != data2.length) return null;
-                    var i = 0;
-                    var center = {x: 0, y: 0};
-                    var width = canvasSource.width;
-                    var x = 0;
-                    var y = 0;
-                    var total = 0;
-                    while (i < (data1.length * 0.25)) {
-                        if (x >= width) {
-                            y++;
-                            x = 0;
-                        }
-                        var average1 = (data1[4*i] + data1[4*i+1] + data1[4*i+2]) / 3;
-                        var average2 = (data2[4*i] + data2[4*i+1] + data2[4*i+2]) / 3;
-                        var diff = threshold(fastAbs(average1 - average2));
-                        if (diff > 0) {
-                            generateParticle(10, 20, 10);
-                            center.x += x;
-                            center.y += y;
-                            total++;
-                        }
-                        target[4*i] = diff;
-                        target[4*i+1] = diff;
-                        target[4*i+2] = diff;
-                        target[4*i+3] = 0xFF;
-                        ++i;
-                        x++;
-                    }
-                    if (total > 0) {
-                        center.x = center.x / total;
-                        center.y = center.y / total;
-                    }
-                    return center;
-                }
-
-                function blend() {
-                    var width = canvasSource.width;
-                    var height = canvasSource.height;
-                    var sourceData = contextSource.getImageData(0, 0, width, height);
-                    if (!lastImageData) {
-                        lastImageData = contextSource.getImageData(0, 0, width, height);
-                    }
-                    var blendedData = contextSource.createImageData(width, height);
-                    var newCenter = differenceAccuracy(blendedData.data, sourceData.data, lastImageData.data);
-                    if (newCenter.x > 0 || newCenter.y > 0) {
-                        center = newCenter;
-                    }
-                    contextBlended.putImageData(blendedData, 0, 0);
-                    lastImageData = sourceData;
-                }
-
-                var blendCount =0 ;
-                function animate() {
-                    requestAnimationFrame(animate);
-                    var delta = clock.getDelta();
-                    tick += delta;
-
-                    controls.update();
-                    if (delta > 0) {
-                        if (hasCamera && blendCount == 0) {
-                            contextSource.drawImage(video, 0, 0, canvasSource.width, canvasSource.height);  
-                            center = blend();
-                        }
-                        
-                        camera.lookAt( scene.position );
-
-                        renderer.render(scene, camera);
-                        particleSystem.update(tick);
-                    }
-                }
-            </script>
-        </body>
-    </head>
 </html>
