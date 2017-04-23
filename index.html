@@ -44,21 +44,16 @@
         init();
         animate();
         function init() {
-            //
             container = document.getElementById( 'container' );
             initVideo();
             camera = new THREE.PerspectiveCamera( 28, window.innerWidth / window.innerHeight, 1, 10000 );
             camera.position.z = 500;
             scene = new THREE.Scene();
-            // The GPU Particle system extends THREE.Object3D, and so you can use it
-            // as you would any other scene graph component.    Particle positions will be
-            // relative to the position of the particle system, but you will probably only need one
-            // system for your whole scene
             particleSystem = new THREE.GPUParticleSystem( {
                 maxParticles: 250000
             } );
             scene.add( particleSystem );
-            // options passed during each spawned
+
             options = {
                 position: new THREE.Vector3(),
                 positionRandomness: .3,
@@ -68,8 +63,8 @@
                 colorRandomness: .2,
                 turbulence: .5,
                 lifetime: 2,
-                size: 5,
-                sizeRandomness: 1
+                size: 10,
+                sizeRandomness: 2
             };
             spawnerOptions = {
                 spawnRate: 15000,
@@ -77,12 +72,10 @@
                 verticalSpeed: 1.33,
                 timeScale: 1
             };
-            //
-            //
-            //
             renderer = new THREE.WebGLRenderer();
             renderer.setPixelRatio( window.devicePixelRatio );
             renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.setClearColor(0xffffff, 1);
             container.appendChild( renderer.domElement );
             //
             controls = new THREE.TrackballControls( camera, renderer.domElement );
