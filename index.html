@@ -8,21 +8,20 @@
 
 <body>
 
+    <p>X: <span id='x'></span></p>
+    <p>Z: <span id='z'></span></p>
+
     <script>
 
-        var canvasSource, video, contextSource, contextBlended;
+        var canvasSource, video, contextSource, contextBlended, lastImageData, leftText, rightText, zText;
 
         init();
         animate();
 
         function init() {
             initVideo();
-            window.addEventListener( 'resize', onWindowResize, false );
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            xText = document.getElementById('x');
+            zText = document.getElementById('z');
         }
 
         function initVideo() {
@@ -51,21 +50,29 @@
             }
         }
 
-        function getBrightness(target, data) {
-            var leftAvg = 0;
-            var rightAvg = 0;
+        function getBrightness(target, curData, prevData) {
+            if (curData.length !== prevData.length) return null;
+            var curLeftAvg = 0;
+            var curRightAvg = 0;
+            var prevLeftAvg = 0;
+            var prevRightAvg = 0;
+
             var i = 0;
             var width = canvasSource.width;
             var x = 0; // x position / column
             var total = 0;
 
             // each pixel represented by 4 elements
-            while (i < (data.length * 0.25)) {
-                var average = (data[4*i] + data[4*i+1] + data[4*i+2]) / 3;
+            while (i < (curData.length * 0.25)) {
+                var curAverage = (curData[4*i] + curData[4*i+1] + curData[4*i+2]) / 3;
+                var prevAverage = (prevData[4*i] + prevData[4*i+1] + prevData[4*i+2]) / 3;
+
                 if (x <= width / 2) { // left half of the screen
-                  leftAvg += average;
+                  curLeftAvg += curAverage;
+                  prevLeftAvg += prevAverage;
                 } else if (x > width / 2 && x < width) { // right half of the screen
-                  rightAvg += average;
+                  curRightAvg += curAverage;
+                  prevRightAvg += prevAverage;
                 } else { // increment down a row when we've reached the end
                     x = 0;
                     continue;
@@ -74,24 +81,32 @@
                 x++;
             }
 
-            leftAvg /= (data.length * 0.125);
-            rightAvg /= (data.length * 0.125);
+            var dataLength = curData.length * 0.125;
+            curLeftAvg /= dataLength;
+            curRightAvg /= dataLength;
+            prevLeftAvg /= dataLength;
+            prevRightAvg /= dataLength;
+
+            curTotalAvg = (curLeftAvg + curRightAvg) / 2;
+            prevTotalAvg = (prevLeftAvg + prevRightAvg) / 2;
 
             var i = 0;
             var x = 0;
-            while (i < (data.length * 0.25)) {
+            while (i < (curData.length * 0.25)) {
               if (x > width) x = 0;
-              target[4*i] = x <= width / 2 ? leftAvg : rightAvg;
-              target[4*i+1] = x <= width / 2 ? leftAvg : rightAvg;
-              target[4*i+2] = x <= width / 2 ? leftAvg : rightAvg;
+              target[4*i] = x <= width / 2 ? curLeftAvg : curRightAvg;
+              target[4*i+1] = x <= width / 2 ? curLeftAvg : curRightAvg;
+              target[4*i+2] = x <= width / 2 ? curLeftAvg : curRightAvg;
               target[4*i+3] = 0xFF;
 
               ++i;
               x++;
+
             }
 
-            console.log("left: " + leftAvg);
-            console.log("right: " + rightAvg);
+            // Sides are inverted when displayed
+            xText.innerHTML = curLeftAvg - curRightAvg;
+            zText.innerHTML = curTotalAvg;
 
         }
 
@@ -99,19 +114,19 @@
             var width = canvasSource.width;
             var height = canvasSource.height;
             var sourceData = contextSource.getImageData(0, 0, width, height);
+            if (!lastImageData) {
+              lastImageData = contextSource.getImageData(0, 0, width, height);
+            }
             var blendedData = contextSource.createImageData(width, height);
-            getBrightness(blendedData.data, sourceData.data);
+            getBrightness(blendedData.data, sourceData.data, lastImageData.data);
             contextBlended.putImageData(blendedData, 0, 0);
+            lastImageData = sourceData;
         }
 
         function animate() {
             requestAnimationFrame( animate );
             contextSource.drawImage(video, 0, 0, canvasSource.width, canvasSource.height);
             blend();
-        }
-
-        function render() {
-            renderer.render( scene, camera );
         }
 
     </script>
