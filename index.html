@@ -4,38 +4,11 @@
     <title>Playscale</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <style>
-    body {
-        font-family: Monospace;
-        background-color: #f0f0f0;
-        margin: 0px;
-        overflow: hidden;
-    }
-    #info {
-        position: absolute;
-        top: 0px;
-        width: 100%;
-        padding: 5px;
-        font-family:Monospace;
-        font-size:13px;
-        text-align:center;
-        color: #ffffff;
-    }
-    a {
-        color: #ffffff;
-    }
-    </style>
 </head>
 
 <body>
 
-    <div id="container" style="display:none;"></div>
-
     <script>
-        var camera, tick = 0,
-            scene, renderer,
-            controls, container,
-            options, spawnerOptions, particleSystem;
 
         var canvasSource, video, contextSource, contextBlended;
 
@@ -77,16 +50,8 @@
                 });
             }
         }
-        function fastAbs(value) {
-            // equivalent to Math.abs();
-            return (value ^ (value >> 31)) - (value >> 31);
-        }
 
-        function threshold(value) {
-            return (value > 0x15) ? 0xFF : 0;
-        }
-
-        function differenceAccuracy(target, data) {
+        function getBrightness(target, data) {
             var leftAvg = 0;
             var rightAvg = 0;
             var i = 0;
@@ -135,7 +100,7 @@
             var height = canvasSource.height;
             var sourceData = contextSource.getImageData(0, 0, width, height);
             var blendedData = contextSource.createImageData(width, height);
-            differenceAccuracy(blendedData.data, sourceData.data);
+            getBrightness(blendedData.data, sourceData.data);
             contextBlended.putImageData(blendedData, 0, 0);
         }
 
