@@ -127,31 +127,52 @@
 
         function differenceAccuracy(target, data1, data2) {
             if (data1.length != data2.length) return null;
+            var leftAvg = 0;
+            var rightAvg = 0;
             var i = 0;
             var width = canvasSource.width;
             var x = 0; // x position / column
             var y = 0; // y position / row
             var total = 0;
+
             // each pixel represented by 4 elements
             while (i < (data1.length * 0.25)) {
-                if (x >= width) { // increment down a row when we've reached the end
+                var average = (data1[4*i] + data1[4*i+1] + data1[4*i+2]) / 3;
+                if (x <= width / 2) { // left half of the screen
+                  leftAvg += average;
+                } else if (x > width / 2 && x < width) { // right half of the screen
+                  rightAvg += average;
+                } else { // increment down a row when we've reached the end
                     y++;
                     x = 0;
+                    continue;
                 }
-                var average1 = (data1[4*i] + data1[4*i+1] + data1[4*i+2]) / 3;
-                var val = threshold(average1);
-                // var average2 = (data2[4*i] + data2[4*i+1] + data2[4*i+2]) / 3;
-                // var diff = threshold(fastAbs(average1 - average2));
-                // if (diff > 0) {
-                //     generateParticle(x, y, 2);
-                // }
-                target[4*i] = val;
-                target[4*i+1] = val;
-                target[4*i+2] = val;
+                ++i;
+                x++;
+            }
+
+            leftAvg /= (data1.length * 0.125);
+            rightAvg /= (data1.length * 0.125);
+
+            var i = 0;
+            var x = 0;
+            var y = 0;
+            while (i < (data1.length * 0.25)) {
+              if (x > width) { // increment down a row when we've reached the end
+                    y++;
+                    x = 0;
+                    continue;
+                }
+                // x <= width / 2 ? leftAvg : rightAvg
+                target[4*i] = x <= width / 2 ? leftAvg : rightAvg;
+                target[4*i+1] = x <= width / 2 ? leftAvg : rightAvg;
+                target[4*i+2] = x <= width / 2 ? leftAvg : rightAvg;
                 target[4*i+3] = 0xFF;
                 ++i;
                 x++;
             }
+            console.log("left: " + leftAvg);
+            console.log("right: " + rightAvg);
         }
 
         function blend() {
